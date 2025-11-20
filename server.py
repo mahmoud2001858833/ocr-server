@@ -8,7 +8,6 @@ import os
 
 app = Flask(__name__)
 
-# تكوين Tesseract
 pytesseract.pytesseract.tesseract_cmd = '/usr/bin/tesseract'
 
 @app.route('/ocr', methods=['POST'])
@@ -22,41 +21,35 @@ def ocr():
         file_url = data['file_url']
         filename = data.get('filename', 'document')
         
-        # تحميل الملف من URL
-        print(f'Downloading file from: {file_url}')
+        print(f'Downloading from: {file_url}')
         response = requests.get(file_url, timeout=120)
         
         if response.status_code != 200:
-            return jsonify({'success': False, 'error': f'فشل تحميل الملف: {response.status_code}'}), 400
+            return jsonify({'success': False, 'error': f'فشل التحميل: {response.status_code}'}), 400
         
         file_data = response.content
         file_size_mb = len(file_data) / (1024 * 1024)
-        print(f'File size: {file_size_mb:.2f} MB')
+        print(f'Size: {file_size_mb:.2f} MB')
         
-        # تحديد نوع الملف
         is_pdf = filename.lower().endswith('.pdf')
         
         if is_pdf:
-            # معالجة PDF
-            print('Converting PDF to images...')
+            print('Converting PDF...')
             pages = convert_from_bytes(file_data, dpi=300)
-            print(f'Processing {len(pages)} pages...')
+            print(f'{len(pages)} pages')
             
             extracted_text = []
-            
             for page_num, page in enumerate(pages, 1):
-                print(f'Processing page {page_num}...')
+                print(f'Page {page_num}...')
                 text = pytesseract.image_to_string(page, lang='ara+eng')
                 extracted_text.append(f"--- صفحة {page_num} ---\n{text}")
             
             full_text = '\n\n'.join(extracted_text)
         else:
-            # معالجة صورة
-            print('Processing image...')
             image = Image.open(io.BytesIO(file_data))
             full_text = pytesseract.image_to_string(image, lang='ara+eng')
         
-        print(f'Extraction complete. Text length: {len(full_text)} characters')
+        print(f'Done: {len(full_text)} chars')
         
         return jsonify({
             'success': True,
@@ -64,14 +57,12 @@ def ocr():
             'file_size_mb': round(file_size_mb, 2)
         })
     
-    except requests.exceptions.RequestException as e:
-        return jsonify({'success': False, 'error': f'خطأ في تحميل الملف: {str(e)}'}), 500
     except Exception as e:
-        return jsonify({'success': False, 'error': f'خطأ في المعالجة: {str(e)}'}), 500
+        return jsonify({'success': False, 'error': str(e)}), 500
 
 @app.route('/health', methods=['GET'])
 def health():
-    return jsonify({'status': 'healthy', 'tesseract': 'available'})
+    return jsonify({'status': 'healthy'})
 
 if __name__ == '__main__':
     port = int(os.environ.get('PORT', 8080))
